@@ -1,0 +1,478 @@
+import React, { useState, useEffect } from 'react'
+import { toast } from '@/components/ui/use-toast'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion'
+
+interface VendorEvaluationProps {
+  vendorId: number
+  vendorName: string
+  scopes?: string[]
+}
+
+interface Evaluation {
+  [key: string]: any
+  experienceScore: number
+  experienceRemark?: string
+  caseStudiesScore: number
+  caseStudiesRemark?: string
+  domainExperienceScore: number
+  domainExperienceRemark?: string
+  approachAlignmentScore: number
+  approachAlignmentRemark?: string
+  understandingChallengesScore: number
+  understandingChallengesRemark?: string
+  solutionTailoringScore: number
+  solutionTailoringRemark?: string
+  strategyAlignmentScore: number
+  strategyAlignmentRemark?: string
+  methodologyScore: number
+  methodologyRemark?: string
+  innovativeStrategiesScore: number
+  innovativeStrategiesRemark?: string
+  stakeholderEngagementScore: number
+  stakeholderEngagementRemark?: string
+  toolsFrameworkScore: number
+  toolsFrameworkRemark?: string
+  costStructureScore: number
+  costStructureRemark?: string
+  costEffectivenessScore: number
+  costEffectivenessRemark?: string
+  roiScore: number
+  roiRemark?: string
+  referencesScore: number
+  referencesRemark?: string
+  testimonialsScore: number
+  testimonialsRemark?: string
+  sustainabilityScore: number
+  sustainabilityRemark?: string
+  deliverablesScore: number
+  deliverablesRemark?: string
+}
+
+const emptyEvaluation: Evaluation = {
+  experienceScore: 0,
+  caseStudiesScore: 0,
+  domainExperienceScore: 0,
+  approachAlignmentScore: 0,
+  understandingChallengesScore: 0,
+  solutionTailoringScore: 0,
+  strategyAlignmentScore: 0,
+  methodologyScore: 0,
+  innovativeStrategiesScore: 0,
+  stakeholderEngagementScore: 0,
+  toolsFrameworkScore: 0,
+  costStructureScore: 0,
+  costEffectivenessScore: 0,
+  roiScore: 0,
+  referencesScore: 0,
+  testimonialsScore: 0,
+  sustainabilityScore: 0,
+  deliverablesScore: 0,
+}
+
+const calculateWeightedScore = (scores: any) => {
+  // 1. Relevance and Quality of Experience (25%)
+  const experienceWeight = (
+    (scores.experienceScore / 10 * 0.10) + // 10%
+    (scores.caseStudiesScore / 10 * 0.10) + // 10%
+    (scores.domainExperienceScore / 10 * 0.05) // 5%
+  ) * 100
+
+  // 2. Understanding of Project Objectives (20%)
+  const understandingWeight = (
+    (scores.approachAlignmentScore / 10 * 0.07) + // 7%
+    (scores.understandingChallengesScore / 10 * 0.07) + // 7%
+    (scores.solutionTailoringScore / 10 * 0.06) // 6%
+  ) * 100
+
+  // 3. Proposed Approach and Methodology (26%)
+  const methodologyWeight = (
+    (scores.strategyAlignmentScore / 10 * 0.07) + // 7%
+    (scores.methodologyScore / 10 * 0.06) + // 6%
+    (scores.innovativeStrategiesScore / 10 * 0.05) + // 5%
+    (scores.stakeholderEngagementScore / 10 * 0.05) + // 5%
+    (scores.toolsFrameworkScore / 10 * 0.03) // 3%
+  ) * 100
+
+  // 4. Cost and Value for Money (14%)
+  const costWeight = (
+    (scores.costStructureScore / 10 * 0.06) + // 6%
+    (scores.costEffectivenessScore / 10 * 0.05) + // 5%
+    (scores.roiScore / 10 * 0.03) // 3%
+  ) * 100
+
+  // 5. References and Testimonials (10%)
+  const referencesWeight = (
+    (scores.referencesScore / 10 * 0.06) + // 6%
+    (scores.testimonialsScore / 10 * 0.02) + // 2%
+    (scores.sustainabilityScore / 10 * 0.02) // 2%
+  ) * 100
+
+  // 6. Deliverable Completeness (5%)
+  const deliverablesWeight = (scores.deliverablesScore / 10 * 0.05) * 100 // 5%
+
+  return experienceWeight + understandingWeight + methodologyWeight + costWeight + referencesWeight + deliverablesWeight
+}
+
+export function VendorEvaluation({ vendorId, vendorName, scopes }: VendorEvaluationProps) {
+  const [newEvaluation, setNewEvaluation] = useState(emptyEvaluation)
+  const [remarkField, setRemarkField] = useState<string | null>(null)
+  const [remarkDialogOpen, setRemarkDialogOpen] = useState(false)
+  const [currentRemark, setCurrentRemark] = useState('')
+
+  // Mock evaluator - in real app this would come from auth context
+  const currentEvaluator = {
+    id: 1,
+    name: 'John Doe',
+    email: 'john@example.com',
+    role: 'CONTRIBUTOR'
+  }
+
+  // Debounced remark update
+  useEffect(() => {
+    if (remarkField && currentRemark !== '') {
+      const remarkKey = `${remarkField}Remark` as keyof typeof newEvaluation
+      const timer = setTimeout(() => {
+        setNewEvaluation(prev => ({
+          ...prev,
+          [remarkKey]: currentRemark
+        }))
+      }, 300)
+      return () => clearTimeout(timer)
+    }
+  }, [currentRemark, remarkField])
+
+  const handleSubmitEvaluation = async () => {
+    try {
+      const overallScore = calculateWeightedScore(newEvaluation)
+      const response = await fetch('/api/evaluations', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...newEvaluation,
+          domain: 'MEDIA',
+          overallScore,
+          vendorId,
+          evaluatorId: currentEvaluator.id,
+        }),
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error || 'Failed to submit evaluation')
+      }
+      
+      toast({
+        title: "Evaluation Submitted Successfully",
+        description: `Overall Score: ${overallScore.toFixed(2)}%`,
+        variant: "default",
+      })
+
+      setNewEvaluation(emptyEvaluation)
+    } catch (error) {
+      console.error('Error submitting evaluation:', error)
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to submit evaluation",
+        variant: "destructive",
+      })
+    }
+  }
+
+  const handleRemarkSave = () => {
+    if (remarkField) {
+      setRemarkDialogOpen(false)
+      setCurrentRemark('')
+      setRemarkField(null)
+    }
+  }
+
+  const renderScoreInput = (label: string, field: keyof typeof newEvaluation, weight: string) => {
+    const remarkKey = `${field}Remark` as keyof typeof newEvaluation
+    const currentRemarkValue = newEvaluation[remarkKey] as string | undefined
+    const score = newEvaluation[field] as number
+    const weightValue = parseFloat(weight.replace('%', '')) / 100
+
+    return (
+      <div className="space-y-2 p-4 border rounded-lg bg-background">
+        <div className="flex justify-between items-start gap-4">
+          <div className="space-y-1 flex-1">
+            <Label className="text-base">{label}</Label>
+            <p className="text-sm text-muted-foreground">Weight: {weight} of category</p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              setRemarkField(field)
+              setCurrentRemark(currentRemarkValue || '')
+              setRemarkDialogOpen(true)
+            }}
+          >
+            {currentRemarkValue ? 'Edit Remark' : 'Add Remark'}
+          </Button>
+        </div>
+        
+        <div className="space-y-2">
+          <div className="flex items-center gap-4">
+            <Input
+              type="number"
+              min="0"
+              max="10"
+              value={newEvaluation[field]}
+              onChange={(e) =>
+                setNewEvaluation({
+                  ...newEvaluation,
+                  [field]: parseFloat(e.target.value) || 0,
+                })
+              }
+              className="w-24"
+            />
+            <span className="text-sm text-muted-foreground">(0-10)</span>
+          </div>
+          
+          <div className="text-sm">
+            <span className="font-medium">Weighted Score: </span>
+            <span className="text-primary">{((score * weightValue) * 100).toFixed(2)}%</span>
+          </div>
+        </div>
+
+        {currentRemarkValue && (
+          <div className="mt-2 p-2 bg-muted rounded-md">
+            <p className="text-sm">
+              <span className="font-medium">Remark: </span>
+              {currentRemarkValue}
+            </p>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  const RemarkDialog = () => (
+    <Dialog open={remarkDialogOpen} onOpenChange={setRemarkDialogOpen}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Add Remark</DialogTitle>
+          <DialogDescription>
+            Add your remarks and reasoning for the score
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <Textarea
+            value={currentRemark}
+            onChange={(e) => setCurrentRemark(e.target.value)}
+            placeholder="Enter your remarks here..."
+            className="min-h-[100px]"
+          />
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setRemarkDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleRemarkSave}>
+              Save Remark
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  )
+
+  return (
+    <>
+      <RemarkDialog />
+      <Dialog>
+        <DialogTrigger asChild>
+          <Button variant="outline">Evaluate Vendor</Button>
+        </DialogTrigger>
+        <DialogContent className="max-w-4xl h-[80vh]">
+          <DialogHeader>
+            <DialogTitle className="flex flex-col gap-2">
+              <div>Vendor Evaluation - {vendorName}</div>
+              <div className="text-lg font-medium text-primary">
+                Media Scope Evaluation
+              </div>
+            </DialogTitle>
+            <DialogDescription>
+              Review and evaluate the vendor based on different criteria
+            </DialogDescription>
+          </DialogHeader>
+
+          <ScrollArea className="h-[calc(80vh-120px)]">
+            <div className="space-y-4 p-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle>New Media Evaluation</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Card className="mb-4">
+                    <CardContent className="pt-6">
+                      <div className="grid gap-4">
+                        <div className="flex justify-between items-center">
+                          <h3 className="font-semibold text-lg">Current Evaluation Progress</h3>
+                          <div className="text-sm text-muted-foreground">
+                            Score out of 100%
+                          </div>
+                        </div>
+                        
+                        <div className="grid gap-2">
+                          <div className="flex justify-between text-sm">
+                            <span>1. Experience & Quality (25%)</span>
+                            <span className="font-medium">{(
+                              (newEvaluation.experienceScore / 10 * 0.10 +
+                              newEvaluation.caseStudiesScore / 10 * 0.10 +
+                              newEvaluation.domainExperienceScore / 10 * 0.05) * 100
+                            ).toFixed(2)}%</span>
+                          </div>
+                          
+                          <div className="flex justify-between text-sm">
+                            <span>2. Project Understanding (20%)</span>
+                            <span className="font-medium">{(
+                              (newEvaluation.approachAlignmentScore / 10 * 0.07 +
+                              newEvaluation.understandingChallengesScore / 10 * 0.07 +
+                              newEvaluation.solutionTailoringScore / 10 * 0.06) * 100
+                            ).toFixed(2)}%</span>
+                          </div>
+                          
+                          <div className="flex justify-between text-sm">
+                            <span>3. Methodology (26%)</span>
+                            <span className="font-medium">{(
+                              (newEvaluation.strategyAlignmentScore / 10 * 0.07 +
+                              newEvaluation.methodologyScore / 10 * 0.06 +
+                              newEvaluation.innovativeStrategiesScore / 10 * 0.05 +
+                              newEvaluation.stakeholderEngagementScore / 10 * 0.05 +
+                              newEvaluation.toolsFrameworkScore / 10 * 0.03) * 100
+                            ).toFixed(2)}%</span>
+                          </div>
+                          
+                          <div className="flex justify-between text-sm">
+                            <span>4. Cost & Value (14%)</span>
+                            <span className="font-medium">{(
+                              (newEvaluation.costStructureScore / 10 * 0.06 +
+                              newEvaluation.costEffectivenessScore / 10 * 0.05 +
+                              newEvaluation.roiScore / 10 * 0.03) * 100
+                            ).toFixed(2)}%</span>
+                          </div>
+                          
+                          <div className="flex justify-between text-sm">
+                            <span>5. References (10%)</span>
+                            <span className="font-medium">{(
+                              (newEvaluation.referencesScore / 10 * 0.06 +
+                              newEvaluation.testimonialsScore / 10 * 0.02 +
+                              newEvaluation.sustainabilityScore / 10 * 0.02) * 100
+                            ).toFixed(2)}%</span>
+                          </div>
+                          
+                          <div className="flex justify-between text-sm">
+                            <span>6. Deliverables (5%)</span>
+                            <span className="font-medium">{(
+                              newEvaluation.deliverablesScore / 10 * 0.05 * 100
+                            ).toFixed(2)}%</span>
+                          </div>
+                          
+                          <div className="h-px bg-border my-2" />
+                          
+                          <div className="flex justify-between font-medium">
+                            <span>Total Score</span>
+                            <span className="text-primary">{calculateWeightedScore(newEvaluation).toFixed(2)}%</span>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Accordion type="single" collapsible className="w-full">
+                    <AccordionItem value="experience">
+                      <AccordionTrigger>1. Relevance and Quality of Experience (25%)</AccordionTrigger>
+                      <AccordionContent>
+                        <div className="grid gap-4">
+                          {renderScoreInput('Experience in Media Production and Technology', 'experienceScore', '10%')}
+                          {renderScoreInput('Case studies of similar transformation initiatives', 'caseStudiesScore', '10%')}
+                          {renderScoreInput('Industry Experience', 'domainExperienceScore', '5%')}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem value="understanding">
+                      <AccordionTrigger>2. Understanding of Project Objectives (20%)</AccordionTrigger>
+                      <AccordionContent>
+                        <div className="grid gap-4">
+                          {renderScoreInput('Strategic Alignment', 'approachAlignmentScore', '7%')}
+                          {renderScoreInput('Understanding of Technical Challenges', 'understandingChallengesScore', '7%')}
+                          {renderScoreInput('Solution Customization', 'solutionTailoringScore', '6%')}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem value="methodology">
+                      <AccordionTrigger>3. Proposed Approach and Methodology (26%)</AccordionTrigger>
+                      <AccordionContent>
+                        <div className="grid gap-4">
+                          {renderScoreInput('Strategy Alignment', 'strategyAlignmentScore', '7%')}
+                          {renderScoreInput('Implementation Methodology', 'methodologyScore', '6%')}
+                          {renderScoreInput('Innovation in Approach', 'innovativeStrategiesScore', '5%')}
+                          {renderScoreInput('Stakeholder Management', 'stakeholderEngagementScore', '5%')}
+                          {renderScoreInput('Tools and Technologies', 'toolsFrameworkScore', '3%')}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem value="cost">
+                      <AccordionTrigger>4. Cost and Value for Money (14%)</AccordionTrigger>
+                      <AccordionContent>
+                        <div className="grid gap-4">
+                          {renderScoreInput('Cost Structure', 'costStructureScore', '6%')}
+                          {renderScoreInput('Cost Effectiveness', 'costEffectivenessScore', '5%')}
+                          {renderScoreInput('ROI Potential', 'roiScore', '3%')}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem value="references">
+                      <AccordionTrigger>5. References and Testimonials (10%)</AccordionTrigger>
+                      <AccordionContent>
+                        <div className="grid gap-4">
+                          {renderScoreInput('Client References', 'referencesScore', '6%')}
+                          {renderScoreInput('Project Testimonials', 'testimonialsScore', '2%')}
+                          {renderScoreInput('Long-term Success', 'sustainabilityScore', '2%')}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+
+                    <AccordionItem value="deliverables">
+                      <AccordionTrigger>6. Deliverable Completeness (5%)</AccordionTrigger>
+                      <AccordionContent>
+                        <div className="grid gap-4">
+                          {renderScoreInput('Required Documentation', 'deliverablesScore', '5%')}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  </Accordion>
+
+                  <Button className="mt-4 w-full" onClick={handleSubmitEvaluation}>
+                    Submit Media Evaluation
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
+    </>
+  )
+}

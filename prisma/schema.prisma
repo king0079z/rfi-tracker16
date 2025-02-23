@@ -1,0 +1,205 @@
+generator client {
+  provider = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model Vendor {
+  id            Int           @id @default(autoincrement())
+  name          String
+  scopes        String[]     // Array of scopes: ["Media", "AI"]
+  chatEnabled   Boolean      @default(true)
+  directDecisionEnabled Boolean @default(true)
+  contacts      String[]     // Array of email addresses
+  rfiReceived   Boolean      @default(false)
+  rfiReceivedAt DateTime?    // Date when RFI was received
+  rfiStatus     String?      // Status of the RFI (e.g., "Pending", "Received", "Under Review", "Completed")
+  finalDecision String?      // "ACCEPTED" or "REJECTED" based on voting
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  evaluations   Evaluation[]
+  documents     Document[]
+  chatMessages  ChatMessage[]
+  votes         VendorVote[]
+}
+
+model User {
+  id                    Int         @id @default(autoincrement())
+  email                 String      @unique
+  password              String
+  name                  String
+  role                  UserRole    @default(PENDING)
+  canAccessChat         Boolean     @default(true)
+  canMakeDirectDecision Boolean     @default(true)
+  canPrintReports      Boolean     @default(true)
+  canExportData        Boolean     @default(true)
+  createdAt            DateTime    @default(now())
+  updatedAt            DateTime    @default(now()) @updatedAt
+  evaluator            Evaluator?
+  chatMessages         ChatMessage[]
+  notifications        ChatNotification[]
+  votes               VendorVote[]
+}
+
+enum UserRole {
+  ADMIN
+  DECISION_MAKER
+  CONTRIBUTOR
+  PENDING
+  VIEWER
+}
+
+model Evaluator {
+  id            Int         @id @default(autoincrement())
+  userId        Int?        @unique
+  name          String
+  email         String      @unique
+  role          String      // Keeping as String for backward compatibility
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @default(now()) @updatedAt
+  evaluations   Evaluation[]
+  comments      Comment[]
+  user          User?       @relation(fields: [userId], references: [id])
+}
+
+model Evaluation {
+  id            Int         @id @default(autoincrement())
+  vendorId      Int
+  evaluatorId   Int
+  domain        String      // "MEDIA" or "AI"
+  
+  // 1. Relevance and Quality of Experience (25%)
+  experienceScore Float     // Base score out of 10
+  experienceRemark String?  // Remark for experience score
+  caseStudiesScore Float    // Base score out of 10
+  caseStudiesRemark String? // Remark for case studies score
+  domainExperienceScore Float   // Base score out of 10
+  domainExperienceRemark String? // Remark for domain experience score
+  
+  // 2. Understanding of Project Objectives (20%)
+  approachAlignmentScore Float  // Base score out of 10
+  approachAlignmentRemark String? // Remark for approach alignment score
+  understandingChallengesScore Float // Base score out of 10
+  understandingChallengesRemark String? // Remark for understanding challenges score
+  solutionTailoringScore Float  // Base score out of 10
+  solutionTailoringRemark String? // Remark for solution tailoring score
+  
+  // 3. Proposed Approach and Methodology (26%)
+  strategyAlignmentScore Float  // Base score out of 10
+  strategyAlignmentRemark String? // Remark for strategy alignment score
+  methodologyScore Float        // Base score out of 10
+  methodologyRemark String?     // Remark for methodology score
+  innovativeStrategiesScore Float // Base score out of 10
+  innovativeStrategiesRemark String? // Remark for innovative strategies score
+  stakeholderEngagementScore Float // Base score out of 10
+  stakeholderEngagementRemark String? // Remark for stakeholder engagement score
+  toolsFrameworkScore Float     // Base score out of 10
+  toolsFrameworkRemark String?  // Remark for tools framework score
+  
+  // 4. Cost and Value for Money (14%)
+  costStructureScore Float      // Base score out of 10
+  costStructureRemark String?   // Remark for cost structure score
+  costEffectivenessScore Float  // Base score out of 10
+  costEffectivenessRemark String? // Remark for cost effectiveness score
+  roiScore Float               // Base score out of 10
+  roiRemark String?            // Remark for ROI score
+  
+  // 5. References and Testimonials (10%)
+  referencesScore Float         // Base score out of 10
+  referencesRemark String?      // Remark for references score
+  testimonialsScore Float       // Base score out of 10
+  testimonialsRemark String?    // Remark for testimonials score
+  sustainabilityScore Float     // Base score out of 10
+  sustainabilityRemark String?  // Remark for sustainability score
+  
+  // 6. Deliverable Completeness (5%)
+  deliverablesScore Float       // Base score out of 10
+  deliverablesRemark String?    // Remark for deliverables score
+  
+  overallScore     Float       // Weighted average of all scores
+  status        String         // "IN_PROGRESS" or "COMPLETED"
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  vendor        Vendor         @relation(fields: [vendorId], references: [id])
+  evaluator     Evaluator      @relation(fields: [evaluatorId], references: [id])
+  comments      Comment[]
+}
+
+model Comment {
+  id            Int         @id @default(autoincrement())
+  content       String
+  evaluationId  Int
+  evaluatorId   Int
+  createdAt     DateTime    @default(now())
+  evaluation    Evaluation  @relation(fields: [evaluationId], references: [id])
+  evaluator     Evaluator   @relation(fields: [evaluatorId], references: [id])
+}
+
+model Document {
+  id            Int         @id @default(autoincrement())
+  name          String
+  url           String
+  type          String      // "RFI_RESPONSE", "EVALUATION", "ADDITIONAL"
+  domain        String      // "MEDIA" or "AI"
+  vendorId      Int
+  uploadedAt    DateTime    @default(now())
+  vendor        Vendor      @relation(fields: [vendorId], references: [id])
+}
+
+model ChatMessage {
+  id            Int         @id @default(autoincrement())
+  content       String
+  vendorId      Int
+  senderId      Int
+  createdAt     DateTime    @default(now())
+  vendor        Vendor      @relation(fields: [vendorId], references: [id])
+  sender        User        @relation(fields: [senderId], references: [id])
+  notifications ChatNotification[]
+}
+
+model ChatNotification {
+  id            Int         @id @default(autoincrement())
+  messageId     Int
+  userId        Int
+  isRead        Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  message       ChatMessage @relation(fields: [messageId], references: [id])
+  user          User        @relation(fields: [userId], references: [id])
+}
+
+model VendorVote {
+  id            Int         @id @default(autoincrement())
+  vendorId      Int
+  userId        Int
+  vote          String      // "ACCEPT" or "REJECT"
+  createdAt     DateTime    @default(now())
+  vendor        Vendor      @relation(fields: [vendorId], references: [id])
+  user          User        @relation(fields: [userId], references: [id])
+  @@unique([vendorId, userId])
+}
+
+model AdminSettings {
+  id                    Int     @id @default(1)
+  chatEnabled           Boolean @default(true)
+  directDecisionEnabled Boolean @default(true)
+  printEnabled          Boolean @default(true)
+  exportEnabled         Boolean @default(true)
+}
+
+model DeploymentError {
+  id            Int      @id @default(autoincrement())
+  errorMessage  String
+  errorStack    String?
+  errorCode     String?
+  environment   String   // e.g., "production", "preview"
+  component     String?  // Which part of the system encountered the error
+  metadata      Json?    // Additional contextual information
+  resolved      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  resolvedAt    DateTime?
+}
